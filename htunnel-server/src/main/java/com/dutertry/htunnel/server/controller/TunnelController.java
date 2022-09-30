@@ -89,7 +89,7 @@ public class TunnelController {
         return ipAddress + "/" + LocalDateTime.now().toString();
     }
     
-    @RequestMapping(value = "/connect", method = RequestMethod.POST)
+    @RequestMapping(value = "/begin", method = RequestMethod.POST)
     public String connection(
             HttpServletRequest request,
             @RequestBody byte[] connectionRequestBytes) throws IOException {
@@ -135,7 +135,7 @@ public class TunnelController {
         return clientConnectionManager.createConnection(ipAddress, connectionConfig, socketChannel);
     }
 
-    @RequestMapping(value = "/write", method = RequestMethod.POST)
+    @RequestMapping(value = "/upload", method = RequestMethod.POST)
     public void write(
             HttpServletRequest request,
             @RequestHeader(HEADER_CONNECTION_ID) String connectionId,
@@ -161,7 +161,7 @@ public class TunnelController {
         }
     }
     
-    @RequestMapping(value = "/read", method = RequestMethod.GET)
+    @RequestMapping(value = "/download", method = RequestMethod.GET)
     public byte[] read(
             HttpServletRequest request,
             @RequestHeader(HEADER_CONNECTION_ID) String connectionId) throws IOException {
@@ -212,7 +212,7 @@ public class TunnelController {
         }
     }
     
-    @RequestMapping(value = "/close", method = RequestMethod.GET)
+    @RequestMapping(value = "/finish", method = RequestMethod.GET)
     public void close(
             HttpServletRequest request,
             @RequestHeader(HEADER_CONNECTION_ID) String connectionId) throws IOException {

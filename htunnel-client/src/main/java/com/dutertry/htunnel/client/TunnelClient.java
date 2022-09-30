@@ -128,7 +128,7 @@ public class TunnelClient implements Runnable {
             
             // Connect
             URI connectUri = new URIBuilder(tunnel)
-                    .setPath("/connect")
+                    .setPath("/begin")
                     .build();
             
             ConnectionConfig connectionConfig = new ConnectionConfig();
@@ -172,7 +172,7 @@ public class TunnelClient implements Runnable {
             }
         }
             
-        Thread writeThread = new Thread(() -> this.writeLoop());
+        Thread writeThread = new Thread(this::writeLoop);
         writeThread.setDaemon(true);
         writeThread.start();
         
@@ -182,7 +182,7 @@ public class TunnelClient implements Runnable {
     private void readLoop() {
         try(CloseableHttpClient httpclient = createHttpCLient()) {
             URI readUri = new URIBuilder(tunnel)
-                    .setPath("/read")
+                    .setPath("/download")
                     .build();
             while(!Thread.currentThread().isInterrupted()) {
                 HttpGet httpget = new HttpGet(readUri);
@@ -236,7 +236,7 @@ public class TunnelClient implements Runnable {
                 if(!bb.hasRemaining() || read <= 0) {
                     if(bb.position() > 0) {
                         URI writeUri = new URIBuilder(tunnel)
-                                .setPath("/write")
+                                .setPath("/upload")
                                 .build();
                         
                         HttpPost httppost = new HttpPost(writeUri);
@@ -278,7 +278,7 @@ public class TunnelClient implements Runnable {
         
         try(CloseableHttpClient httpclient = createHttpCLient()) {
             URI closeUri = new URIBuilder(tunnel)
-                    .setPath("/close")
+                    .setPath("/finish")
                     .build();
             
             HttpGet httpget = new HttpGet(closeUri);
