@@ -36,6 +36,7 @@ import javax.crypto.spec.SecretKeySpec;
 
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.openssl.PEMKeyPair;
 import org.bouncycastle.openssl.PEMParser;
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 
@@ -82,15 +83,19 @@ public class CryptoUtils {
         
         Cipher cipher = Cipher.getInstance(AES_ENCRYPT_ALGO);
         cipher.init(Cipher.DECRYPT_MODE, secret, new IvParameterSpec(iv));
-        byte[] plainText = cipher.doFinal(cipherText);
-        return plainText;
+        return cipher.doFinal(cipherText);
     }
     
     public static PrivateKey readRSAPrivateKey(String keyPath) throws IOException {
         PrivateKeyInfo privateKeyInfo;
         try(FileReader reader = new FileReader(keyPath);
                 PEMParser pemParser = new PEMParser(reader)) {
-            privateKeyInfo = PrivateKeyInfo.getInstance(pemParser.readObject());
+            Object obj = pemParser.readObject();
+            if (obj instanceof PEMKeyPair) {
+                privateKeyInfo = ((PEMKeyPair) obj).getPrivateKeyInfo();
+            } else {
+                privateKeyInfo = PrivateKeyInfo.getInstance(pemParser.readObject());
+            }
         }
         JcaPEMKeyConverter converter = new JcaPEMKeyConverter();
         return converter.getPrivateKey(privateKeyInfo);

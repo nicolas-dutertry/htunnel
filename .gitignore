@@ -13,3 +13,5 @@ buildNumber.properties
 .classpath
 .settings
 application.pid
+.idea
+*.iml

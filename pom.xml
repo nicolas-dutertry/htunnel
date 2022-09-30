@@ -23,13 +23,13 @@
             <dependency>
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok</artifactId>
-                <version>1.18.10</version>
+                <version>1.18.24</version>
             </dependency>
             
             <dependency>
                 <groupId>org.bouncycastle</groupId>
-                <artifactId>bcpkix-jdk15on</artifactId>
-                <version>1.67</version>
+                <artifactId>bcpkix-jdk18on</artifactId>
+                <version>1.72</version>
             </dependency>
             
             <dependency>
