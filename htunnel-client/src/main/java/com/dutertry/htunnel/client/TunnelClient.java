@@ -28,7 +28,9 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.security.PrivateKey;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHost;
@@ -114,9 +116,13 @@ public class TunnelClient implements Runnable {
         LOGGER.info("Connecting to tunnel {}", tunnel);
         try(CloseableHttpClient httpclient = createHttpCLient()) {
             // Hello
-            URI helloUri = new URIBuilder(tunnel)
-                    .setPath("/hello")
+            URIBuilder helloBuilder = new URIBuilder(tunnel);
+            List<String> pathList = new ArrayList<>(helloBuilder.getPathSegments());
+            pathList.add("hello");
+            URI helloUri = helloBuilder
+                    .setPathSegments(pathList)
                     .build();
+            LOGGER.info("url: {}", helloUri.toString());
             String helloResult;
             try(CloseableHttpResponse response = httpclient.execute(new HttpGet(helloUri))) {
                 if(response.getStatusLine().getStatusCode() != HttpStatus.SC_OK) {
@@ -127,8 +133,11 @@ public class TunnelClient implements Runnable {
             }
             
             // Connect
-            URI connectUri = new URIBuilder(tunnel)
-                    .setPath("/begin")
+            URIBuilder connectBuilder = new URIBuilder(tunnel);
+            pathList = new ArrayList<>(connectBuilder.getPathSegments());
+            pathList.add("begin");
+            URI connectUri = connectBuilder
+                    .setPathSegments(pathList)
                     .build();
             
             ConnectionConfig connectionConfig = new ConnectionConfig();
@@ -181,8 +190,11 @@ public class TunnelClient implements Runnable {
     
     private void readLoop() {
         try(CloseableHttpClient httpclient = createHttpCLient()) {
-            URI readUri = new URIBuilder(tunnel)
-                    .setPath("/download")
+            URIBuilder readBuilder = new URIBuilder(tunnel);
+            List<String> pathList = new ArrayList<>(readBuilder.getPathSegments());
+            pathList.add("download");
+            URI readUri = readBuilder
+                    .setPathSegments(pathList)
                     .build();
             while(!Thread.currentThread().isInterrupted()) {
                 HttpGet httpget = new HttpGet(readUri);
@@ -235,8 +247,11 @@ public class TunnelClient implements Runnable {
                 
                 if(!bb.hasRemaining() || read <= 0) {
                     if(bb.position() > 0) {
-                        URI writeUri = new URIBuilder(tunnel)
-                                .setPath("/upload")
+                        URIBuilder writeBuilder = new URIBuilder(tunnel);
+                        List<String> pathList = new ArrayList<>(writeBuilder.getPathSegments());
+                        pathList.add("upload");
+                        URI writeUri = writeBuilder
+                                .setPathSegments(pathList)
                                 .build();
                         
                         HttpPost httppost = new HttpPost(writeUri);
