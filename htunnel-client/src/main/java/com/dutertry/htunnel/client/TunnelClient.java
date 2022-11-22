@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 
+import com.dutertry.htunnel.common.Constants;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpStatus;
@@ -73,10 +74,13 @@ public class TunnelClient implements Runnable {
     private final int bufferSize;
     private final boolean base64Encoding;
     private final PrivateKey privateKey;
+
+    private final String publicKeyDigest;
     
     private String connectionId;
     
-    public TunnelClient(SocketChannel socketChannel, String host, int port, String tunnel, String proxy, int bufferSize, boolean base64Encoding, PrivateKey privateKey) {
+    public TunnelClient(SocketChannel socketChannel, String host, int port, String tunnel, String proxy, int bufferSize,
+                        boolean base64Encoding, PrivateKey privateKey, String publicKeyDigest) {
         this.socketChannel = socketChannel;
         this.host = host;
         this.port = port;
@@ -85,6 +89,7 @@ public class TunnelClient implements Runnable {
         this.bufferSize = bufferSize;
         this.base64Encoding = base64Encoding;
         this.privateKey = privateKey;
+        this.publicKeyDigest = publicKeyDigest;
     }
     
     public CloseableHttpClient createHttpCLient() throws URISyntaxException {
@@ -158,6 +163,9 @@ public class TunnelClient implements Runnable {
             }
             
             HttpPost httppost = new HttpPost(connectUri);
+            if (StringUtils.isNotBlank(publicKeyDigest)) {
+                httppost.addHeader(Constants.HEADER_CLIENT_ID, publicKeyDigest);
+            }
             httppost.setEntity(new ByteArrayEntity(sendBytes));
             
             try(CloseableHttpResponse response = httpclient.execute(httppost)) {

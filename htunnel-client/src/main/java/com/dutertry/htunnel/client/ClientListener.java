@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.nio.file.Paths;
 import java.security.PrivateKey;
 
 import javax.annotation.PostConstruct;
@@ -64,8 +65,13 @@ public class ClientListener implements Runnable {
     
     @Value("${private-key:}")
     private String privateKeyPath;
-    
+
     private PrivateKey privateKey;
+
+    @Value("${public-key:}")
+    private String publicKeyPath;
+
+    private String publicKeyDigest;
     
     @Value("${single:false}")
     private boolean single;
@@ -77,6 +83,11 @@ public class ClientListener implements Runnable {
         if(StringUtils.isNotBlank(privateKeyPath)) {
             LOGGER.info("Using private key {} for connections", privateKeyPath);
             privateKey = CryptoUtils.readRSAPrivateKey(privateKeyPath);
+        }
+
+        if (StringUtils.isNotBlank(publicKeyPath)) {
+            publicKeyDigest = CryptoUtils.md5Digest(Paths.get(publicKeyPath));
+            LOGGER.info("Using client id: {}", publicKeyDigest);
         }
         
         LOGGER.info("Starting listener thread");
@@ -102,7 +113,8 @@ public class ClientListener implements Runnable {
                         proxy,
                         bufferSize,
                         base64Encoding,
-                        privateKey);
+                        privateKey,
+                        publicKeyDigest);
                 Thread thread = new Thread(tunnelClient);
                 thread.start();
                 

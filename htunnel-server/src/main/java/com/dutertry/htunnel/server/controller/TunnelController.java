@@ -21,23 +21,34 @@ package com.dutertry.htunnel.server.controller;
 
 import static com.dutertry.htunnel.common.Constants.HEADER_CONNECTION_ID;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SocketChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.MessageDigest;
 import java.security.PublicKey;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
 
 import javax.annotation.PostConstruct;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import com.dutertry.htunnel.common.Constants;
 import org.apache.commons.lang3.StringUtils;
+import org.bouncycastle.crypto.digests.MD5Digest;
+import org.bouncycastle.jcajce.provider.digest.MD5;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -73,13 +84,35 @@ public class TunnelController {
     @Value("${public-key:}")
     private String publicKeyPath;
     
-    private PublicKey publicKey;
-    
+//    private PublicKey publicKey;
+
+    private Map<String, PublicKey> publicKeyMap;
+
+    public TunnelController() {
+        publicKeyMap = new HashMap<>();
+    }
+
     @PostConstruct
     public void init() throws IOException {
         if(StringUtils.isNotBlank(publicKeyPath)) {
-            LOGGER.info("Using public key {} for connection certification", publicKeyPath);
-            publicKey = CryptoUtils.readRSAPublicKey(publicKeyPath);
+            Path path = Paths.get(publicKeyPath);
+            if (Files.exists(path)) {
+                if (Files.isDirectory(path)) {
+                    LOGGER.info("Using public key in directory {} for connection certification", publicKeyPath);
+                    Files.list(path).filter(p -> p.toString().toLowerCase().endsWith(".pem")).forEach(p -> {
+                        try {
+                            String keyPath = p.toString();
+                            publicKeyMap.put(CryptoUtils.md5Digest(p), CryptoUtils.readRSAPublicKey(keyPath));
+                            LOGGER.info("Load public key {}", keyPath);
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
+                } else {
+                    publicKeyMap.put(CryptoUtils.md5Digest(path), CryptoUtils.readRSAPublicKey(publicKeyPath));
+                    LOGGER.info("Using public key {} for connection certification", publicKeyPath);
+                }
+            }
         }
     }
     
@@ -95,7 +128,14 @@ public class TunnelController {
             @RequestBody byte[] connectionRequestBytes) throws IOException {
         
         byte[] decrypted = connectionRequestBytes;
-        if(publicKey != null) {
+        if(publicKeyMap.size() > 0) {
+            String clientId = request.getHeader(Constants.HEADER_CLIENT_ID);
+            PublicKey publicKey;
+            if (StringUtils.isNotBlank(clientId) && publicKeyMap.containsKey(clientId)) {
+                publicKey = publicKeyMap.get(clientId);
+            } else {
+                publicKey = publicKeyMap.get(0);
+            }
             try {
                 decrypted = CryptoUtils.decryptRSA(connectionRequestBytes, publicKey);
             } catch(Exception e) {
