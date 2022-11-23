@@ -44,6 +44,14 @@ You can change port number with option --server.port:
 
     java -jar htunnel-server-version.jar --server.port=80
 
+You can use public key with option --public-key (*.pem):
+
+    java -jar htunnel-server-version.jar --public-key=<fileOrDirectory>
+
+You can make the server automatically reload public key with option --load-public-key-interval (0 means never reload):
+
+    java -jar htunnel-server-version.jar --load-public-key-interval=<minutes>
+
 ### htunnel-client
 
 Run htunnel-client on any machine in the corporate network:

@@ -84,7 +84,7 @@ public class TunnelController {
     @Value("${public-key:}")
     private String publicKeyPath;
 
-    @Value("${load-publicKey-interval:0}")
+    @Value("${load-public-key-interval:0}")
     private long loadPublicKeyIntervalInMinutes;
     
     private Map<String, PublicKey> publicKeyMap;
