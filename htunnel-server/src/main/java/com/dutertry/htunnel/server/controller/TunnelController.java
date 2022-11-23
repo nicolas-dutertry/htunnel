@@ -83,20 +83,24 @@ public class TunnelController {
     
     @Value("${public-key:}")
     private String publicKeyPath;
-    
-//    private PublicKey publicKey;
 
+    @Value("${load-publicKey-interval:0}")
+    private long loadPublicKeyIntervalInMinutes;
+    
     private Map<String, PublicKey> publicKeyMap;
+
+    private long lastTimeLoadPublicKey;
 
     public TunnelController() {
         publicKeyMap = new HashMap<>();
     }
 
-    @PostConstruct
-    public void init() throws IOException {
+    private synchronized void loadPublicKeys() throws IOException {
+        lastTimeLoadPublicKey = System.currentTimeMillis();
         if(StringUtils.isNotBlank(publicKeyPath)) {
             Path path = Paths.get(publicKeyPath);
             if (Files.exists(path)) {
+                publicKeyMap.clear();
                 if (Files.isDirectory(path)) {
                     LOGGER.info("Using public key in directory {} for connection certification", publicKeyPath);
                     Files.list(path).filter(p -> p.toString().toLowerCase().endsWith(".pem")).forEach(p -> {
@@ -115,11 +119,25 @@ public class TunnelController {
             }
         }
     }
+
+    @PostConstruct
+    public void init() throws IOException {
+        loadPublicKeys();
+    }
     
     @RequestMapping(value = "/hello", method = RequestMethod.GET)
     public String hello(HttpServletRequest request) {
         String ipAddress = request.getRemoteAddr();
-        return ipAddress + "/" + LocalDateTime.now().toString();
+        if (loadPublicKeyIntervalInMinutes > 0 &&
+                System.currentTimeMillis() - lastTimeLoadPublicKey > loadPublicKeyIntervalInMinutes * 60000) {
+            try {
+                loadPublicKeys();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return ipAddress + "/" + LocalDateTime.now().toString() + "/"
+                + (loadPublicKeyIntervalInMinutes == 0 ? 0 : lastTimeLoadPublicKey);
     }
     
     @RequestMapping(value = "/begin", method = RequestMethod.POST)
