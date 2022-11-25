@@ -27,7 +27,9 @@ import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
-import java.security.PrivateKey;
+import java.security.*;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -43,6 +45,9 @@ import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.utils.URIBuilder;
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+import org.apache.http.conn.ssl.TrustAllStrategy;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.BasicCredentialsProvider;
@@ -50,6 +55,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.DefaultProxyRoutePlanner;
+import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,6 +64,9 @@ import com.dutertry.htunnel.common.ConnectionConfig;
 import com.dutertry.htunnel.common.ConnectionRequest;
 import com.dutertry.htunnel.common.crypto.CryptoUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import sun.security.ssl.SSLSocketFactoryImpl;
+
+import javax.net.ssl.*;
 
 /**
  * @author Nicolas Dutertry
@@ -92,7 +101,8 @@ public class TunnelClient implements Runnable {
         this.publicKeyDigest = publicKeyDigest;
     }
     
-    public CloseableHttpClient createHttpCLient() throws URISyntaxException {
+    public CloseableHttpClient createHttpCLient() throws URISyntaxException, NoSuchAlgorithmException,
+            KeyStoreException, KeyManagementException {
         HttpClientBuilder builder = HttpClients.custom();
         if(StringUtils.isNotBlank(proxy)) {
             URI proxyUri = new URI(proxy);
@@ -113,6 +123,12 @@ public class TunnelClient implements Runnable {
                 builder.setDefaultCredentialsProvider(credentialsProvider);
             }
         }
+        SSLContext sslContext =
+                SSLContextBuilder.create().loadTrustMaterial(new TrustAllStrategy()).build();
+        HostnameVerifier allowAllHosts = new NoopHostnameVerifier();
+        SSLConnectionSocketFactory connectionFactory = new SSLConnectionSocketFactory(
+                sslContext, allowAllHosts);
+        builder.setSSLSocketFactory(connectionFactory);
         return  builder.build();
     }
 
