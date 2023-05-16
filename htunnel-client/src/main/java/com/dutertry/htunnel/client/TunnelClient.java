@@ -144,6 +144,10 @@ public class TunnelClient implements Runnable {
                     .setPathSegments(pathList)
                     .build();
             LOGGER.info("url: {}", helloUri.toString());
+            HttpGet httpGet = new HttpGet(helloUri);
+            if (StringUtils.isNotBlank(publicKeyDigest)) {
+                httpGet.addHeader(Constants.HEADER_CLIENT_ID, publicKeyDigest);
+            }
             String helloResult;
             try(CloseableHttpResponse response = httpclient.execute(new HttpGet(helloUri))) {
                 if(response.getStatusLine().getStatusCode() != HttpStatus.SC_OK) {
@@ -151,6 +155,17 @@ public class TunnelClient implements Runnable {
                     return;
                 }
                 helloResult = EntityUtils.toString(response.getEntity());
+            }
+            String strLastTimeLoadPublicKey = StringUtils.substringAfterLast(helloResult, "/");
+            long lastTimeLoadPublicKey = 0;
+            try {
+                lastTimeLoadPublicKey = Long.parseLong(strLastTimeLoadPublicKey);
+                helloResult = StringUtils.substringBeforeLast(helloResult, "/");
+            } catch (NumberFormatException e) {
+
+            }
+            if (lastTimeLoadPublicKey > 0) {
+                LOGGER.info("The server reload public key at {}ms ago", System.currentTimeMillis() - lastTimeLoadPublicKey);
             }
             
             // Connect

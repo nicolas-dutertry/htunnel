@@ -128,12 +128,16 @@ public class TunnelController {
     @RequestMapping(value = "/hello", method = RequestMethod.GET)
     public String hello(HttpServletRequest request) {
         String ipAddress = request.getRemoteAddr();
-        if (loadPublicKeyIntervalInMinutes > 0 &&
-                System.currentTimeMillis() - lastTimeLoadPublicKey > loadPublicKeyIntervalInMinutes * 60000) {
-            try {
-                loadPublicKeys();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
+        if(publicKeyMap.size() > 0) {
+            String clientId = request.getHeader(Constants.HEADER_CLIENT_ID);
+            if (StringUtils.isNotBlank(clientId) && !publicKeyMap.containsKey(clientId)
+                && loadPublicKeyIntervalInMinutes > 0
+                && System.currentTimeMillis() - lastTimeLoadPublicKey > loadPublicKeyIntervalInMinutes * 60000) {
+                try {
+                    loadPublicKeys();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
             }
         }
         return ipAddress + "/" + LocalDateTime.now().toString() + "/"
