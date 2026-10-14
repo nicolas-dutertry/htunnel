@@ -22,4 +22,18 @@ public class CryptoUtilsTest {
         
         Assert.assertEquals(s, new String(decrypted));  
     }
+    
+    @Test
+    public void testRSASignature() throws Exception {
+        java.security.KeyPairGenerator generator = java.security.KeyPairGenerator.getInstance("RSA");
+        generator.initialize(2048);
+        java.security.KeyPair keyPair = generator.generateKeyPair();
+        
+        byte[] data = "Hello World".getBytes();
+        String signature = CryptoUtils.signRSA(data, keyPair.getPrivate());
+        
+        Assert.assertTrue(CryptoUtils.verifyRSA(data, signature, keyPair.getPublic()));
+        Assert.assertFalse(CryptoUtils.verifyRSA("Other".getBytes(), signature, keyPair.getPublic()));
+        Assert.assertFalse(CryptoUtils.verifyRSA(data, "not base64!", keyPair.getPublic()));
+    }
 }

@@ -20,6 +20,7 @@
 package com.dutertry.htunnel.server.controller;
 
 import static com.dutertry.htunnel.common.Constants.HEADER_CONNECTION_ID;
+import static com.dutertry.htunnel.common.Constants.HEADER_SIGNATURE;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -92,20 +93,25 @@ public class TunnelController {
     @RequestMapping(value = "/connect", method = RequestMethod.POST)
     public String connection(
             HttpServletRequest request,
+            @RequestHeader(value = HEADER_SIGNATURE, required = false) String signature,
             @RequestBody byte[] connectionRequestBytes) throws IOException {
         
-        byte[] decrypted = connectionRequestBytes;
         if(publicKey != null) {
+            boolean valid;
             try {
-                decrypted = CryptoUtils.decryptRSA(connectionRequestBytes, publicKey);
+                valid = signature != null && CryptoUtils.verifyRSA(connectionRequestBytes, signature, publicKey);
             } catch(Exception e) {
-                LOGGER.info("Unable to decrypt connection request: {}", e.toString());
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+                LOGGER.info("Unable to verify connection request: {}", e.toString());
+                valid = false;
+            }
+            if(!valid) {
+                LOGGER.info("Invalid signature for connection request");
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN);
             }
         }
         
         ObjectMapper mapper = new ObjectMapper();
-        ConnectionRequest connectionRequest = mapper.readValue(decrypted, ConnectionRequest.class);
+        ConnectionRequest connectionRequest = mapper.readValue(connectionRequestBytes, ConnectionRequest.class);
         
         String ipAddress = request.getRemoteAddr();
         LocalDateTime now = LocalDateTime.now();

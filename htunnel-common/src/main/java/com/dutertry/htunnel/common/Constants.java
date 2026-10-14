@@ -25,4 +25,5 @@ package com.dutertry.htunnel.common;
  */
 public class Constants {
     public static final String HEADER_CONNECTION_ID = "X-HTUNNEL-ID";
+    public static final String HEADER_SIGNATURE = "X-HTUNNEL-SIGNATURE";
 }

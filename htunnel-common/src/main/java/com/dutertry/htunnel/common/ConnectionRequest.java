@@ -19,15 +19,53 @@
  */
 package com.dutertry.htunnel.common;
 
-import lombok.Data;
+import java.util.Objects;
 
 /**
  * @author Nicolas Dutertry
  *
  */
-@Data
 public class ConnectionRequest {
     private String helloResult;
     
     private ConnectionConfig connectionConfig;
+
+    public String getHelloResult() {
+        return helloResult;
+    }
+
+    public void setHelloResult(String helloResult) {
+        this.helloResult = helloResult;
+    }
+
+    public ConnectionConfig getConnectionConfig() {
+        return connectionConfig;
+    }
+
+    public void setConnectionConfig(ConnectionConfig connectionConfig) {
+        this.connectionConfig = connectionConfig;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(helloResult, connectionConfig);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if(this == obj) {
+            return true;
+        }
+        if(!(obj instanceof ConnectionRequest)) {
+            return false;
+        }
+        ConnectionRequest other = (ConnectionRequest) obj;
+        return Objects.equals(helloResult, other.helloResult)
+                && Objects.equals(connectionConfig, other.connectionConfig);
+    }
+
+    @Override
+    public String toString() {
+        return "ConnectionRequest(helloResult=" + helloResult + ", connectionConfig=" + connectionConfig + ")";
+    }
 }

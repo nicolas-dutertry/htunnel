@@ -20,6 +20,7 @@
 package com.dutertry.htunnel.client;
 
 import static com.dutertry.htunnel.common.Constants.HEADER_CONNECTION_ID;
+import static com.dutertry.htunnel.common.Constants.HEADER_SIGNATURE;
 
 import java.io.IOException;
 import java.net.URI;
@@ -143,13 +144,11 @@ public class TunnelClient implements Runnable {
             
             ObjectMapper mapper = new ObjectMapper();
             byte[] connectionRequestBytes = mapper.writeValueAsBytes(connectionRequest);
-            byte[] sendBytes = connectionRequestBytes;
-            if(privateKey != null) {
-                sendBytes = CryptoUtils.encryptRSA(connectionRequestBytes, privateKey);
-            }
-            
             HttpPost httppost = new HttpPost(connectUri);
-            httppost.setEntity(new ByteArrayEntity(sendBytes));
+            if(privateKey != null) {
+                httppost.addHeader(HEADER_SIGNATURE, CryptoUtils.signRSA(connectionRequestBytes, privateKey));
+            }
+            httppost.setEntity(new ByteArrayEntity(connectionRequestBytes));
             
             try(CloseableHttpResponse response = httpclient.execute(httppost)) {
                 if(response.getStatusLine().getStatusCode() != HttpStatus.SC_OK) {

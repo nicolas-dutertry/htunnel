@@ -26,6 +26,10 @@ import java.security.GeneralSecurityException;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.Signature;
+import java.security.SignatureException;
+import java.security.spec.MGF1ParameterSpec;
+import java.security.spec.PSSParameterSpec;
 import java.util.Base64;
 
 import javax.crypto.Cipher;
@@ -43,7 +47,7 @@ public class CryptoUtils {
     private static final String AES_KEY_ALGO = "AES";
     private static final String AES_ENCRYPT_ALGO = "AES/CBC/PKCS5Padding";
     private static final int IV_LENGTH_BYTE = 16;
-    private static final String RSA_CRYPT_ALG = "RSA/ECB/PKCS1Padding";
+    private static final String RSA_SIGN_ALG = "RSASSA-PSS";
     
     public static SecretKey generateAESKey() throws NoSuchAlgorithmException {
         KeyGenerator keyGen = KeyGenerator.getInstance(AES_KEY_ALGO);
@@ -106,17 +110,39 @@ public class CryptoUtils {
         return converter.getPublicKey(subjectPublicKeyInfo);
     }
     
-    public static byte[] decryptRSA(byte[] crypted, PublicKey publicKey) throws GeneralSecurityException {
-        byte[] decoded = Base64.getDecoder().decode(crypted);
-        Cipher cipher = Cipher.getInstance(RSA_CRYPT_ALG);
-        cipher.init(Cipher.DECRYPT_MODE, publicKey);
-        return cipher.doFinal(decoded);
+    /**
+     * Signs data with RSASSA-PSS (SHA-256) and returns the Base64 encoded signature.
+     */
+    public static String signRSA(byte[] data, PrivateKey privateKey) throws GeneralSecurityException {
+        Signature signature = newSignature();
+        signature.initSign(privateKey);
+        signature.update(data);
+        return Base64.getEncoder().encodeToString(signature.sign());
     }
     
-    public static byte[] encryptRSA(byte[] decrypted, PrivateKey privateKey) throws GeneralSecurityException {
-        Cipher cipher = Cipher.getInstance(RSA_CRYPT_ALG);
-        cipher.init(Cipher.ENCRYPT_MODE, privateKey);
-        byte[] crypted = cipher.doFinal(decrypted);
-        return Base64.getEncoder().encode(crypted);
+    /**
+     * Verifies a Base64 encoded RSASSA-PSS signature.
+     */
+    public static boolean verifyRSA(byte[] data, String base64Signature, PublicKey publicKey) throws GeneralSecurityException {
+        byte[] signatureBytes;
+        try {
+            signatureBytes = Base64.getDecoder().decode(base64Signature);
+        } catch(IllegalArgumentException e) {
+            return false;
+        }
+        Signature signature = newSignature();
+        signature.initVerify(publicKey);
+        signature.update(data);
+        try {
+            return signature.verify(signatureBytes);
+        } catch(SignatureException e) {
+            return false;
+        }
+    }
+    
+    private static Signature newSignature() throws GeneralSecurityException {
+        Signature signature = Signature.getInstance(RSA_SIGN_ALG);
+        signature.setParameter(new PSSParameterSpec("SHA-256", "MGF1", MGF1ParameterSpec.SHA256, 32, 1));
+        return signature;
     }
 }
