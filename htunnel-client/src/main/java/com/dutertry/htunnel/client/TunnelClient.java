@@ -89,7 +89,7 @@ public class TunnelClient implements Runnable {
         this.privateKey = privateKey;
     }
     
-    public CloseableHttpClient createHttpCLient() throws URISyntaxException {
+    private CloseableHttpClient createHttpClient() throws URISyntaxException {
         HttpClientBuilder builder = HttpClients.custom();
         if(StringUtils.isNotBlank(proxy)) {
             URI proxyUri = new URI(proxy);
@@ -116,7 +116,7 @@ public class TunnelClient implements Runnable {
     @Override
     public void run() {
         LOGGER.info("Connecting to tunnel {}", tunnel);
-        try(CloseableHttpClient httpclient = createHttpCLient()) {
+        try(CloseableHttpClient httpclient = createHttpClient()) {
             // Hello
             URI helloUri = new URIBuilder(tunnel)
                     .setPath("/hello")
@@ -181,7 +181,7 @@ public class TunnelClient implements Runnable {
     }
     
     private void readLoop() {
-        try(CloseableHttpClient httpclient = createHttpCLient()) {
+        try(CloseableHttpClient httpclient = createHttpClient()) {
             URI readUri = new URIBuilder(tunnel)
                     .setPath("/read")
                     .build();
@@ -238,7 +238,7 @@ public class TunnelClient implements Runnable {
     }
     
     private void writeLoop() {
-        try(CloseableHttpClient httpclient = createHttpCLient();
+        try(CloseableHttpClient httpclient = createHttpClient();
                 Selector selector = Selector.open()) {
             
             socketChannel.register(selector, SelectionKey.OP_READ);
@@ -296,7 +296,7 @@ public class TunnelClient implements Runnable {
             LOGGER.error("Error in write loop", e);
         }
         
-        try(CloseableHttpClient httpclient = createHttpCLient()) {
+        try(CloseableHttpClient httpclient = createHttpClient()) {
             URI closeUri = new URIBuilder(tunnel)
                     .setPath("/close")
                     .build();
