@@ -28,6 +28,8 @@ import java.net.SocketAddress;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.security.PublicKey;
 import java.time.LocalDateTime;
@@ -65,8 +67,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @RestController
 public class TunnelController {
     private static final Logger LOGGER = LoggerFactory.getLogger(TunnelController.class);
-    
+    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final long READ_WAIT_TIME = 10000L;
+
     
     @Autowired
     private ClientConnectionManager clientConnectionManager;
@@ -110,8 +113,7 @@ public class TunnelController {
             }
         }
         
-        ObjectMapper mapper = new ObjectMapper();
-        ConnectionRequest connectionRequest = mapper.readValue(connectionRequestBytes, ConnectionRequest.class);
+        ConnectionRequest connectionRequest = MAPPER.readValue(connectionRequestBytes, ConnectionRequest.class);
         
         String ipAddress = request.getRemoteAddr();
         LocalDateTime now = LocalDateTime.now();
@@ -161,8 +163,19 @@ public class TunnelController {
         
         if(bytes.length > 0) {
             ByteBuffer bb = ByteBuffer.wrap(bytes);
-            while(bb.hasRemaining()) {
-                socketChannel.write(bb);
+            try(Selector selector = Selector.open()) {
+                boolean registered = false;
+                while(bb.hasRemaining()) {
+                    if(socketChannel.write(bb) == 0 && bb.hasRemaining()) {
+                        // Send buffer is full: wait until writable instead of busy-waiting
+                        if(!registered) {
+                            socketChannel.register(selector, SelectionKey.OP_WRITE);
+                            registered = true;
+                        }
+                        selector.select();
+                        selector.selectedKeys().clear();
+                    }
+                }
             }
         }
     }
@@ -183,35 +196,50 @@ public class TunnelController {
         bb.clear();
         
         long startTime  = System.currentTimeMillis();
-        while(true) {
-            int read;
-            try {
-                read = socketChannel.read(bb);
-            } catch(ClosedChannelException e) {
-                read = -1;
-            }
-            
-            if(!bb.hasRemaining() || read <= 0) {
-                if(bb.position() > 0) {
-                    bb.flip();
-                    
-                    ByteBuffer resultBuffer = bb;
-                    if(connection.getConnectionConfig().isBase64Encoding()) {
-                        resultBuffer = Base64.getEncoder().encode(bb);
-                    }
-                    
-                    byte[] bytes = new byte[resultBuffer.limit()];
-                    resultBuffer.get(bytes);
-                    
-                    return bytes;
-                } else {
-                    if(read == -1) {
-                        throw new ResponseStatusException(HttpStatus.GONE, "EOF reached");
-                    }
-                    
-                    long now = System.currentTimeMillis();
-                    if(now-startTime >= READ_WAIT_TIME) {
-                        return new byte[0];
+        try(Selector selector = Selector.open()) {
+            boolean registered = false;
+            while(true) {
+                int read;
+                try {
+                    read = socketChannel.read(bb);
+                } catch(ClosedChannelException e) {
+                    read = -1;
+                }
+                
+                if(!bb.hasRemaining() || read <= 0) {
+                    if(bb.position() > 0) {
+                        bb.flip();
+                        
+                        ByteBuffer resultBuffer = bb;
+                        if(connection.getConnectionConfig().isBase64Encoding()) {
+                            resultBuffer = Base64.getEncoder().encode(bb);
+                        }
+                        
+                        byte[] bytes = new byte[resultBuffer.limit()];
+                        resultBuffer.get(bytes);
+                        
+                        return bytes;
+                    } else {
+                        if(read == -1) {
+                            throw new ResponseStatusException(HttpStatus.GONE, "EOF reached");
+                        }
+                        
+                        long remaining = READ_WAIT_TIME - (System.currentTimeMillis() - startTime);
+                        if(remaining <= 0) {
+                            return new byte[0];
+                        }
+                        
+                        // Block until data is available instead of busy-waiting
+                        try {
+                            if(!registered) {
+                                socketChannel.register(selector, SelectionKey.OP_READ);
+                                registered = true;
+                            }
+                            selector.select(remaining);
+                            selector.selectedKeys().clear();
+                        } catch(ClosedChannelException e) {
+                            throw new ResponseStatusException(HttpStatus.GONE, "Channel closed");
+                        }
                     }
                 }
             }

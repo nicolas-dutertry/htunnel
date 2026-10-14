@@ -26,6 +26,8 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.security.PrivateKey;
@@ -63,6 +65,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  */
 public class TunnelClient implements Runnable {
     private static final Logger LOGGER = LoggerFactory.getLogger(TunnelClient.class);
+    private static final ObjectMapper MAPPER = new ObjectMapper();
     
     private final SocketChannel socketChannel;
     private final String host;
@@ -142,8 +145,7 @@ public class TunnelClient implements Runnable {
             connectionRequest.setHelloResult(helloResult);
             connectionRequest.setConnectionConfig(connectionConfig);            
             
-            ObjectMapper mapper = new ObjectMapper();
-            byte[] connectionRequestBytes = mapper.writeValueAsBytes(connectionRequest);
+            byte[] connectionRequestBytes = MAPPER.writeValueAsBytes(connectionRequest);
             HttpPost httppost = new HttpPost(connectUri);
             if(privateKey != null) {
                 httppost.addHeader(HEADER_SIGNATURE, CryptoUtils.signRSA(connectionRequestBytes, privateKey));
@@ -207,8 +209,19 @@ public class TunnelClient implements Runnable {
                         LOGGER.debug("{} byte(s) received", bytes.length); 
                         
                         ByteBuffer bb = ByteBuffer.wrap(bytes);
-                        while(bb.hasRemaining()) {
-                            socketChannel.write(bb);
+                        try(Selector selector = Selector.open()) {
+                            boolean registered = false;
+                            while(bb.hasRemaining()) {
+                                if(socketChannel.write(bb) == 0 && bb.hasRemaining()) {
+                                    // Send buffer is full: wait until writable instead of busy-waiting
+                                    if(!registered) {
+                                        socketChannel.register(selector, SelectionKey.OP_WRITE);
+                                        registered = true;
+                                    }
+                                    selector.select();
+                                    selector.selectedKeys().clear();
+                                }
+                            }
                         }
                     }
                 }
@@ -225,8 +238,10 @@ public class TunnelClient implements Runnable {
     }
     
     private void writeLoop() {
-        try(CloseableHttpClient httpclient = createHttpCLient()) {
+        try(CloseableHttpClient httpclient = createHttpCLient();
+                Selector selector = Selector.open()) {
             
+            socketChannel.register(selector, SelectionKey.OP_READ);
             ByteBuffer bb = ByteBuffer.allocate(bufferSize);
             
             while(!Thread.currentThread().isInterrupted()) {
@@ -268,6 +283,12 @@ public class TunnelClient implements Runnable {
                 
                 if(read == -1) {                    
                     break;
+                }
+                
+                if(read == 0) {
+                    // Block until the local socket has data instead of busy-waiting
+                    selector.select();
+                    selector.selectedKeys().clear();
                 }
             }
             
